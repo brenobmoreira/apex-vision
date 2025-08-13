@@ -58,12 +58,11 @@ def display_image_segmentation(image_path, model, confidence=0.2):
         print("No detections found")
         return
 
-    masks_data = []
-    # --- PRIMEIRA PASSAGEM: Coletar todas as máscaras e ângulos absolutos ---
+    # Primeiro, coletamos todas as detecções
+    all_detections = []
     for i, mask_tensor in enumerate(results[0].masks.data):
         confidence = float(results[0].boxes.conf[i].cpu().numpy())
-
-        # Pula detecções com confiança baixa
+        
         if confidence <= 0.75:
             continue
             
@@ -82,14 +81,38 @@ def display_image_segmentation(image_path, model, confidence=0.2):
             center_x = int(np.mean(x))
             center_y = int(np.mean(y))
             
-            masks_data.append({
+            all_detections.append({
                 "id": i,
                 "class_name": class_name,
                 "center": (center_x, center_y),
                 "confidence": confidence,
-                "absolute_angle": absolute_angle
+                "absolute_angle": absolute_angle,
+                "mask_bool": mask_bool,
+                "mask_tensor": mask_tensor
             })
-            draw_text_with_shadow(result_image, str(i), (center_x, center_y), scale=0.9, thickness=3)
+    
+    # Filtra para manter apenas a detecção de L2 com maior confiança
+    l2_detections = [d for d in all_detections if d["class_name"] == 'L2']
+    other_detections = [d for d in all_detections if d["class_name"] != 'L2']
+    
+    # Se houver detecções de L2, pega a de maior confiança
+    best_l2 = None
+    if l2_detections:
+        best_l2 = max(l2_detections, key=lambda x: x["confidence"])
+        print(f"L2 detection - ID: {best_l2['id']} with confidence: {best_l2['confidence']:.2f}")
+    
+    # Combina as detecções (L1 + melhor L2 + outras classes)
+    masks_data = other_detections
+    if best_l2:
+        masks_data.append(best_l2)
+    
+    # Redesenha as máscaras e IDs apenas para as detecções selecionadas
+    result_image = image.copy()
+    for data in masks_data:
+        # Redesenha a linha
+        fit_line_and_get_angle(data["mask_bool"], result_image)
+        # Redesenha o ID
+        draw_text_with_shadow(result_image, str(data["id"]), data["center"], scale=0.9, thickness=3)
 
     angle_ref = None
     for data in masks_data:
@@ -100,9 +123,7 @@ def display_image_segmentation(image_path, model, confidence=0.2):
     if angle_ref is None:
         print("Warning: Reference class 'L1' not found. Cannot calculate relative angles.")
 
-    # --- SEGUNDA PASSAGEM: Calcular ângulos relativos e exibir ---
     y_offset = 35
-    # --- ALTERAÇÃO 2: Título dos ângulos com fonte maior ---
     draw_text_with_shadow(result_image, "Angulos:", (10, y_offset), scale=0.8, thickness=2)
     
     masks_data.sort(key=lambda x: x['id'])
@@ -119,15 +140,12 @@ def display_image_segmentation(image_path, model, confidence=0.2):
                 if relative_angle > 90:
                     relative_angle = 180 - relative_angle
 
-        # Exibe ID, ângulo e confiança
         y_offset += 25
         angle_text = f"ID {data['id']}: {relative_angle:.1f}°"
         conf_text = f"  (conf: {data['confidence']:.2f})"
         
-        # Desenha o ID e ângulo em branco com sombra preta
         draw_text_with_shadow(result_image, angle_text, (10, y_offset), scale=0.7, thickness=2)
         
-        # Desenha a confiança em cinza claro
         text_size = cv2.getTextSize(angle_text, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)[0]
         cv2.putText(result_image, conf_text, (15 + text_size[0], y_offset), 
                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 200, 200), 1, cv2.LINE_AA)
@@ -147,7 +165,7 @@ def main():
     print(f"Loading model: {model_path}")
     model = YOLO(model_path)
     
-    test_files = ["7"]
+    test_files = ["6", "7"]
     for test_id in test_files:
         input_image = f'extracted_frames/teste{test_id}.png'
         if not os.path.exists(input_image):
