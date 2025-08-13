@@ -141,7 +141,7 @@ def display_image_segmentation(image_path, model, confidence=0.2):
                     relative_angle = 180 - relative_angle
 
         y_offset += 25
-        angle_text = f"ID {data['id']}: {relative_angle:.1f}°"
+        angle_text = f"ID {data['id']}: {relative_angle:.1f}"
         conf_text = f"  (conf: {data['confidence']:.2f})"
         
         draw_text_with_shadow(result_image, angle_text, (10, y_offset), scale=0.7, thickness=2)
