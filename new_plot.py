@@ -61,6 +61,12 @@ def display_image_segmentation(image_path, model, confidence=0.2):
     masks_data = []
     # --- PRIMEIRA PASSAGEM: Coletar todas as máscaras e ângulos absolutos ---
     for i, mask_tensor in enumerate(results[0].masks.data):
+        confidence = float(results[0].boxes.conf[i].cpu().numpy())
+
+        # Pula detecções com confiança baixa
+        if confidence <= 0.75:
+            continue
+            
         mask_np = mask_tensor.cpu().numpy()
         class_id = int(results[0].boxes.cls[i].cpu().numpy())
         class_name = class_names.get(class_id, "Unknown")
@@ -76,15 +82,12 @@ def display_image_segmentation(image_path, model, confidence=0.2):
             center_x = int(np.mean(x))
             center_y = int(np.mean(y))
             
-            # Obtém a confiança da detecção
-            confidence = float(results[0].boxes.conf[i].cpu().numpy())
-            
             masks_data.append({
                 "id": i,
                 "class_name": class_name,
-                "absolute_angle": absolute_angle,
                 "center": (center_x, center_y),
                 "confidence": confidence,
+                "absolute_angle": absolute_angle
             })
             draw_text_with_shadow(result_image, str(i), (center_x, center_y), scale=0.9, thickness=3)
 
@@ -144,7 +147,7 @@ def main():
     print(f"Loading model: {model_path}")
     model = YOLO(model_path)
     
-    test_files = ["6"]
+    test_files = ["7"]
     for test_id in test_files:
         input_image = f'extracted_frames/teste{test_id}.png'
         if not os.path.exists(input_image):
