@@ -1,0 +1,7 @@
+__pycache__
+.venv
+*.mp4
+*.jpeg
+*.jpg
+*.png
+*.pt
